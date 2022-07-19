@@ -19,6 +19,6 @@ The File Copy function will only work with text files, binary files are NOT supp
 - NDIR = Create a new directory on the Microcontroller
 - LDIR = Display files in local source directory
 - RDIR = Display files in remote (Microcontroller) destination directory
-- RDEL = Delete a file/directory from Microcontroller
+- RDEL = Delete a file/directory on Microcontroller
 - COPY = Copy the current file from the local directory to the remote directory
 
