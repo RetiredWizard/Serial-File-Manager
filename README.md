@@ -9,9 +9,9 @@ File manager that bootstraps itself over a serial REPL connection
 This is primarly useful for accessing the Flash on CircuitPython or MicroPython boards that don't mount a virtual USB drive to the host computer. With the new Circuit Python Web workflow features this will become less of an issue.
 
 
-- In MU or Thonny make sure you have the configuration set to use the "Standard Python" or "The same interpreter that runs Thonny"
-- Then update the Serial parameters on line 2 to match the serial connection to your microcontroller board
-- Run the mubootstrap.py program
+1. In MU or Thonny make sure you have the configuration set to use the "Standard Python" or "The same interpreter that runs Thonny"
+2. Then update the Serial parameters on line 2 to match the serial connection to your microcontroller board
+3. Run the mubootstrap.py program
 
 
 ## File Manager Commands ##
