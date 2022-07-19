@@ -1,6 +1,11 @@
 # Serial-File-Manager
 File manager that bootstraps itself over a serial REPL connection
 
+**The Second line of code will need to be edited for the specific com port and parameters**
+```
+    ser = serial.Serial('com33',115200,timeout=5)
+```
+
 This is primarly useful for accessing the Flash on CircuitPython or MicroPython boards that don't mount a virtual USB drive to the host computer. With the new Circuit Python Web workflow features this will become less of an issue.
 
 The File Copy function will only work with text files, binary files are NOT supported.
