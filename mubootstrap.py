@@ -168,7 +168,7 @@ while inp[0].upper() != "Q":
         print("RCD = Set the remote (destination) directory on the Microcontroller")
         print("      When changing directories, relative directory paths work")
         print("      i.e. '..' up one, '../..' up 2")
-        print("      paths that don't start with a '/','\' will be from the current path")
+        print("      paths that don't start with a '/','\\' will be from the current path")
         print("NDIR = Create a new directory on the Microcontroller")
         print("LDIR = Display files in local source directory")
         print("RDIR = Display files in remote (Microcontroller) destination directory")
