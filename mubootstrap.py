@@ -75,6 +75,9 @@ def print_directory(path, remote=False, tabs=0):
 
 print(sendToRepl(ser,"\x04"))
 print(sendToRepl(ser,"\r\n"))
+print(sendToRepl(ser,"\x03"))
+print(sendToRepl(ser,"\r\n"))
+
 print(sendToRepl(ser,"import os\r\n"))
 print(sendToRepl(ser,"os.chdir('/')\r\n"))
 microfiles = sendToRepl(ser,"os.listdir()\r\n")
