@@ -65,7 +65,7 @@ def print_directory(path, remote=False, tabs=0):
     else:
         dirlist = os.listdir(path)
 
-    for file in dirlist:
+    for file in sorted(dirlist,key=str.lower):
         if remote:
             stattxt = sendToRepl(ser,"os.stat('"+file+"')\r\n")
             stats = list(map(int,(stattxt.split('\r\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
@@ -147,8 +147,6 @@ while inp[0].upper() != "Q":
         print_directory(localdir)
     elif inp.upper() == "RDIR":
         print_directory(localdir, remote=True)
-    elif inp.upper() == "RDIR":
-        pass
     elif inp.upper() == "LCD":
         try:
             os.chdir(input("Enter source directory: "))
