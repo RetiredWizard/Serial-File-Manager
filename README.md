@@ -1,7 +1,7 @@
 # Serial-File-Manager
 File manager that bootstraps itself over a serial REPL connection
 
-**The Second line of code will need to be edited for the specific com port and parameters**
+**The Ninth line of code will need to be edited for the specific com port and parameters**
 ```
     ser = serial.Serial('com33',115200,timeout=5)
 ```
@@ -10,7 +10,7 @@ This is primarly useful for accessing the Flash on CircuitPython or MicroPython 
 
 
 1. In MU or Thonny make sure you have the configuration set to use the "Standard Python" or "The same interpreter that runs Thonny"
-2. Then update the Serial parameters on line 2 to match the serial connection to your microcontroller board
+2. Then update the Serial parameters on line 9 to match the serial connection to your microcontroller board
 3. Run the mubootstrap.py program
 
 
