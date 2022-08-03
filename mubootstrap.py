@@ -1,7 +1,12 @@
 import serial,time,os
-ser = serial.Serial('com33',115200,timeout=5)
-if ser.inWaiting():
-    print(ser.read(ser.inWaiting()).decode())
+
+def reset_serial(ser):
+    print("Resetting Serial Port...")
+    try:
+        ser.close()
+    except:
+        pass
+    return serial.Serial('com38',9600,timeout=10,write_timeout=15)
 
 def create_writefile():
     writefile = [
@@ -23,10 +28,25 @@ def create_writefile():
 
 def sendToRepl(ser,replCmd):
     ser.write(replCmd.encode())
-    time.sleep(.2)
+    wait_time = 5
+    while wait_time > 0:
+        time.sleep(.005)
+        wait_time -= .005
+        if ser.inWaiting():
+            break
+
     if ser.inWaiting():
-        return ser.read(ser.inWaiting()).decode()
-    return None
+        retVal = ""
+
+        while True:
+            if ser.inWaiting() == 0:
+                break
+            retVal += ser.read(ser.inWaiting()).decode()
+            time.sleep(.05)
+            
+        return retVal
+    else:
+        return None
 
 def copyToRemote(hostfilename,microfilename):
     if microfilename == "" or microfilename == "*":
@@ -34,7 +54,7 @@ def copyToRemote(hostfilename,microfilename):
     file = open(hostfilename)
     sendToRepl(ser,"writefile.wf('"+microfilename+"')\r\n")
     for line in file:
-        print(sendToRepl(ser,line.replace('\n','')+'\r\n'))
+        print(sendToRepl(ser,line.replace('\n','')+'\r\n').replace('\r\n',''))
     print(sendToRepl(ser,"*\r\n"))
     file.close()
 
@@ -73,9 +93,26 @@ def print_directory(path, remote=False, tabs=0):
         #if isdir:
             #print_directory(path + "/" + file, tabs + 1)
 
-print(sendToRepl(ser,"\x04"))
+ser = reset_serial(None)
+print("Serial port reset")
+if ser.inWaiting():
+    print(ser.read(ser.inWaiting()).decode())
+
+print("Attempting to get board attention")
+try:
+    print(sendToRepl(ser," "))
+except:
+    print(sendToRepl(ser,"\x04"))
+if sendToRepl(ser," ") == None:
+    ser = reset_serial(ser)
+time.sleep(5)
 print(sendToRepl(ser,"\r\n"))
+if sendToRepl(ser,"\r\n") == None:
+    print(sendToRepl(ser,"\x04"))
+    time.sleep(5)
+    
 print(sendToRepl(ser,"\x03"))
+print(sendToRepl(ser,"\r\n"))
 print(sendToRepl(ser,"\r\n"))
 
 print(sendToRepl(ser,"import os\r\n"))
@@ -174,5 +211,8 @@ while inp[0].upper() != "Q":
         print("RDIR = Display files in remote (Microcontroller) destination directory")
         print("RDEL = Delete a file/directory from Microcontroller")
         print("COPY = Copy the current file from the local directory to the remote directory")
+        
+    elif inp.upper() == "Q":
+        ser.close()
 
 
