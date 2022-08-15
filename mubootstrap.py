@@ -6,7 +6,8 @@ def reset_serial(ser):
         ser.close()
     except:
         pass
-    return serial.Serial('com38',9600,timeout=10,write_timeout=15)
+    return serial.Serial('com20',9600,timeout=10,write_timeout=15)
+    #return serial.Serial('com39',115200,timeout=10,write_timeout=15)
 
 def create_writefile():
     writefile = [
@@ -43,7 +44,7 @@ def sendToRepl(ser,replCmd):
                 break
             retVal += ser.read(ser.inWaiting()).decode()
             time.sleep(.05)
-            
+
         return retVal
     else:
         return None
@@ -99,6 +100,7 @@ if ser.inWaiting():
     print(ser.read(ser.inWaiting()).decode())
 
 print("Attempting to get board attention")
+print(sendToRepl(ser,"\x02"))
 try:
     print(sendToRepl(ser," "))
 except:
@@ -110,7 +112,7 @@ print(sendToRepl(ser,"\r\n"))
 if sendToRepl(ser,"\r\n") == None:
     print(sendToRepl(ser,"\x04"))
     time.sleep(5)
-    
+
 print(sendToRepl(ser,"\x03"))
 print(sendToRepl(ser,"\r\n"))
 print(sendToRepl(ser,"\r\n"))
@@ -209,7 +211,7 @@ while inp[0].upper() != "Q":
         print("RDIR = Display files in remote (Microcontroller) destination directory")
         print("RDEL = Delete a file/directory from Microcontroller")
         print("COPY = Copy the current file from the local directory to the remote directory")
-        
+
     elif inp.upper() == "Q":
         ser.close()
 
