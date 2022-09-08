@@ -28,25 +28,50 @@ def create_writefile():
     #print(sendToRepl(ser,"f.close()\r\n"))
 
     for lchar in "f = open('writefile.py','w')":
-        print(sendToRepl(ser,lchar,.0001),end="")
-    print(sendToRepl(ser,"\r\n").replace("\r\n","\n"))
+        print(sendCharToRepl(ser,lchar),end="")
+    print(sendCharToRepl(ser,"\r"))
     for codeline in writefile:
         for lchar in "f.write('":
-            print(sendToRepl(ser,lchar,.0001),end="")
+            print(sendCharToRepl(ser,lchar),end="")
         for lchar in codeline:
-            print(sendToRepl(ser,lchar,.0001),end="")
+            print(sendCharToRepl(ser,lchar),end="")
         for lchar in "')":
-            print(sendToRepl(ser,lchar,.0001),end="")
-        print(sendToRepl(ser,"\r\n").replace("\r\n","\n"))
+            print(sendCharToRepl(ser,lchar),end="")
+        print(sendCharToRepl(ser,"\r"))
     for lchar in "f.close()":
-        print(sendToRepl(ser,lchar,.0001),end="")
-    print(sendToRepl(ser,"\r\n").replace("\r\n","\n"))
+        print(sendCharToRepl(ser,lchar),end="")
+    print(sendCharToRepl(ser,"\r"))
+    time.sleep(.002)
+
+def sendCharToRepl(ser,replCmd):
+    retVal = sendToRepl(ser,replCmd,.0001)
+    wait_time = time.monotonic()
+    if replCmd == '\r':
+        while retVal != '\r\n>>> ' and time.monotonic()-wait_time < 5:
+            if time.monotonic() < wait_time:
+                wait_time = time.monotonic()
+            if ser.inWaiting():
+                retVal += ser.read(ser.inWaiting()).decode()
+            if len(retVal) >= 4:
+                if retVal[-4:] == '>>> ':
+                    break
+        if len(retVal) >= 6:
+            if retVal[-6:] == '\r\n>>> ':
+                retVal = retVal[:-6]+'\n>>> '
+    else:
+        while retVal != replCmd and time.monotonic()-wait_time < 5:
+            if time.monotonic() < wait_time:
+                wait_time = time.monotonic()
+            if ser.inWaiting():
+                retVal = ser.read(ser.inWaiting()).decode()
+
+    return retVal
 
 def sendToRepl(ser,replCmd,delaytime=.01):
     ser.write(replCmd.encode())
     wait_time = 5
-    #if delaytime > .0009:
-    time.sleep(delaytime*5)
+    if delaytime > .0001:
+        time.sleep(delaytime*5)
     waiting = 0
     deltatime = max(delaytime,.001)
     while wait_time > 0:
@@ -54,8 +79,8 @@ def sendToRepl(ser,replCmd,delaytime=.01):
         wait_time -= deltatime
         if ser.inWaiting() and waiting == ser.inWaiting():
             break
-        #if delaytime > .0009:
-        time.sleep(delaytime)
+        if delaytime > .0001:
+            time.sleep(delaytime)
         waiting = ser.inWaiting()
 
     if ser.inWaiting() and delaytime < .001:
@@ -84,7 +109,7 @@ def copyToRemote(hostfilename,microfilename,careful=False):
         if line.replace('\r','').replace('\n','') != "":
             if careful:
                 for lchar in line.replace('\r','').replace('\n',''):
-                    tstline += sendToRepl(ser,lchar,.0001)
+                    tstline += sendCharToRepl(ser,lchar)
             else:
                 tstline = sendToRepl(ser,line.replace('\r','').replace('\n',''))
 
@@ -195,12 +220,12 @@ print(sendToRepl(ser,"\x03"))
 print(sendToRepl(ser,"\r\n"))
 print(sendToRepl(ser,"\r\n"))
 
-print(sendToRepl(ser,"import os\r\n",.1))
-print(sendToRepl(ser,"os.chdir('/')\r\n",.1))
-microfiles = sendToRepl(ser,"os.listdir()\r\n",.1)
+print(sendToRepl(ser,"import os\r\n",.2))
+print(sendToRepl(ser,"os.chdir('/')\r\n",.2))
+microfiles = sendToRepl(ser,"os.listdir()\r\n",.2)
 if microfiles.find('writefile.py') == -1:
     create_writefile()
-print(sendToRepl(ser,"import writefile\r\n",.1))
+print(sendToRepl(ser,"import writefile\r\n",.2))
 
 inp = "*"
 hostfilename = ""
