@@ -22,42 +22,34 @@ def create_writefile():
                 '            file.write(inp+"\\\\r\\\\n")\\r\\n',
                 '    file.close()\\r\\n']
 
-    #print(sendToRepl(ser,"f = open('writefile.py','w')\r\n"))
-    #for codeline in writefile:
-    #    print(sendToRepl(ser,"f.write('"+codeline+"')\r\n"))
-    #print(sendToRepl(ser,"f.close()\r\n"))
-
-    for lchar in "f = open('writefile.py','w')":
-        print(sendCharToRepl(ser,lchar),end="")
-    print(sendCharToRepl(ser,"\r"))
+    print(safeStrToRepl(ser,"f = open('writefile.py','w')\r"),end="")
     for codeline in writefile:
-        for lchar in "f.write('":
-            print(sendCharToRepl(ser,lchar),end="")
-        for lchar in codeline:
-            print(sendCharToRepl(ser,lchar),end="")
-        for lchar in "')":
-            print(sendCharToRepl(ser,lchar),end="")
-        print(sendCharToRepl(ser,"\r"))
-    for lchar in "f.close()":
-        print(sendCharToRepl(ser,lchar),end="")
-    print(sendCharToRepl(ser,"\r"))
+        print(safeStrToRepl(ser,"f.write('"+codeline+"')\r"),end="")
+    print(safeStrToRepl(ser,"f.close()\r"),end="")
     time.sleep(.002)
 
-def sendCharToRepl(ser,replCmd):
+def safeStrToRepl(ser,replCmd,prmpt=">>> "):
+    retVal = ""
+    for lchar in replCmd:
+        retVal += sendCharToRepl(ser,lchar,prmpt)
+
+    return retVal
+
+def sendCharToRepl(ser,replCmd,prmpt=">>> "):
     retVal = sendToRepl(ser,replCmd,.0001)
     wait_time = time.monotonic()
     if replCmd == '\r':
-        while retVal != '\r\n>>> ' and time.monotonic()-wait_time < 5:
+        while retVal != '\r\n'+prmpt and time.monotonic()-wait_time < 5:
             if time.monotonic() < wait_time:
                 wait_time = time.monotonic()
             if ser.inWaiting():
                 retVal += ser.read(ser.inWaiting()).decode()
-            if len(retVal) >= 4:
-                if retVal[-4:] == '>>> ':
+            if len(retVal) >= len(prmpt):
+                if retVal[-len(prmpt):] == prmpt:
                     break
-        if len(retVal) >= 6:
-            if retVal[-6:] == '\r\n>>> ':
-                retVal = retVal[:-6]+'\n>>> '
+        if len(retVal) >= len(prmpt)+2:
+            if retVal[-(len(prmpt)+2):] == '\r\n'+prmpt:
+                retVal = retVal[:-(len(prmpt)+2)]+'\n'+prmpt
     else:
         while retVal != replCmd and time.monotonic()-wait_time < 5:
             if time.monotonic() < wait_time:
@@ -72,7 +64,7 @@ def sendToRepl(ser,replCmd,delaytime=.01):
     wait_time = 5
     if delaytime > .0001:
         time.sleep(delaytime*5)
-    waiting = 0
+    waiting = -1
     deltatime = max(delaytime,.001)
     while wait_time > 0:
         #print(waiting)
@@ -102,65 +94,83 @@ def copyToRemote(hostfilename,microfilename,careful=False):
     if microfilename == "" or microfilename == "*":
         microfilename = hostfilename
     file = open(hostfilename)
-    sendToRepl(ser,"writefile.wf('"+microfilename+"')\r\n")
+    if careful:
+        print(safeStrToRepl(ser,"writefile.wf('"+microfilename+"')\r","."),end="")
+    else:
+        print(sendToRepl(ser,"writefile.wf('"+microfilename+"')\r\n"),end="")
     for line in file:
+        cleanLine = line.replace('\r','').replace('\n','').replace('\t','    ')
         #print(line,end="")
         tstline = ""
-        if line.replace('\r','').replace('\n','') != "":
+        if cleanLine != "":
             if careful:
-                for lchar in line.replace('\r','').replace('\n',''):
-                    tstline += sendCharToRepl(ser,lchar)
+                tstline = safeStrToRepl(ser,cleanLine)
             else:
-                tstline = sendToRepl(ser,line.replace('\r','').replace('\n',''))
+                tstline = sendToRepl(ser,cleanLine)
 
-        if (len(tstline) == 0 and len(line.replace('\r','').replace('\n','')) == 0):
+        if (len(tstline) == 0 and len(cleanLine) == 0):
             pass
         elif len(tstline) == 0 or \
-            (tstline[0] != "." and tstline != line.replace('\r','').replace('\n','')) or \
-            (tstline[0] == "." and tstline[1:] != line.replace('\r','').replace('\n','')):
+            (tstline[0] != "." and tstline != cleanLine) or \
+            (tstline[0] == "." and tstline[1:] != cleanLine):
 
             time.sleep(1)
             tstline += ser.read(ser.inWaiting()).decode()
 
         if len(tstline) == 0:
-            if len(line.replace('\r','').replace('\n','')) != 0:
+            if len(cleanLine) != 0:
                 print("****** Transmission Error *******")
                 print("><")
-                print(">"+line.replace('\r','').replace('\n','')+"<")
+                print(">"+cleanLine+"<")
                 transErr += 1
-        elif tstline != line.replace('\r','').replace('\n',''):
+        elif tstline != cleanLine:
             if tstline[0] != ".":
                 print("****** Transmission Error *******")
                 print(">"+tstline+"<")
-                print(">"+line.replace('\r','').replace('\n','')+"<")
+                print(">"+cleanLine+"<")
                 transErr += 1
             else:
-                if tstline[1:] != line.replace('\r','').replace('\n',''):
+                if tstline[1:] != cleanLine:
                     print("****** Transmission Error *******")
                     print(">"+tstline+"<")
-                    print(">"+line.replace('\r','').replace('\n','')+"<")
+                    print(">"+cleanLine+"<")
                     transErr += 1
 
         print(tstline,end="")
-        #print(sendToRepl(ser,'\r\n').replace('\r\n','\n'),end="")
-        tstline = sendToRepl(ser,'\r\n')
+        if careful:
+            tstline = sendCharToRepl(ser,"\r",".")
+        else:
+            #print(sendToRepl(ser,'\r\n').replace('\r\n','\n'),end="")
+            tstline = sendToRepl(ser,'\r\n')
         #print("DEBUG:>"+tstline+"<")
         kount = 50
+        padtstline = False
+        if tstline == "":
+            tstline = " "
+            padtstline = True
         while tstline[-1] != "." and kount>0:
             kount -= 1
             #print("@",end="")
             tstline += ser.read(ser.inWaiting()).decode()
+        if padtstline:
+            tstline = tstline[1:]
         print(tstline.replace('\r\n','\n'),end="")
 
-    print(sendToRepl(ser,"*\r\n"))
+    if careful:
+        print(sendCharToRepl(ser,"*"),end="")
+        print(sendCharToRepl(ser,"\r"))
+    else:
+        print(sendToRepl(ser,"*\r\n"),end="")
     file.close()
     return transErr
 
 def print_directory(path, remote=False, tabs=0):
     if remote:
-        dirlisttxt = sendToRepl(ser,"os.listdir()\r\n")
+        safeStrToRepl(ser,"os.listdir()")
+        dirlisttxt = sendCharToRepl(ser,"\r")
+        #dirlisttxt = sendToRepl(ser,"os.listdir()\r\n")
         try:
-            dirlist = (dirlisttxt.split('\r\n')[1:-1][0])[1:-1].replace("'","").replace(" ","").split(",")
+            dirlist = (dirlisttxt.split('\n')[1:-1][0])[1:-1].replace("'","").replace(" ","").split(",")
         except:
             dirlist = []
     else:
@@ -168,9 +178,11 @@ def print_directory(path, remote=False, tabs=0):
 
     for file in sorted(dirlist,key=str.lower):
         if remote:
-            stattxt = sendToRepl(ser,"os.stat('"+file+"')\r\n")
+            safeStrToRepl(ser,"os.stat('"+file+"')")
+            stattxt = sendCharToRepl(ser,"\r")
+            #stattxt = sendToRepl(ser,"os.stat('"+file+"')\r\n")
             try:
-                stats = list(map(int,(stattxt.split('\r\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
+                stats = list(map(int,(stattxt.split('\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
             except:
                 stats = [0,0,0,0,0,0,0]
         else:
@@ -200,43 +212,47 @@ def print_directory(path, remote=False, tabs=0):
 ser = reset_serial(None)
 print("Serial port reset")
 if ser.inWaiting():
-    print(ser.read(ser.inWaiting()).decode())
+    print(ser.read(ser.inWaiting()).decode(),end="")
 
 print("Attempting to get board attention")
-print(sendToRepl(ser,"\x02"))
+print(sendToRepl(ser,"\x02"),end="")
 try:
-    print(sendToRepl(ser," "))
+    print(sendToRepl(ser," "),end="")
 except:
-    print(sendToRepl(ser,"\x04"))
+    print(sendToRepl(ser,"\x04"),end="")
 if sendToRepl(ser,"\r\n") == "":
     ser = reset_serial(ser)
 time.sleep(5)
-print(sendToRepl(ser,"\r\n"))
+print(sendToRepl(ser,"\r\n"),end="")
 if sendToRepl(ser,"\r\n") == "":
-    print(sendToRepl(ser,"\x04"))
+    print(sendToRepl(ser,"\x04"),end="")
     time.sleep(5)
 
-print(sendToRepl(ser,"\x03"))
-print(sendToRepl(ser,"\r\n"))
-print(sendToRepl(ser,"\r\n"))
+print(sendToRepl(ser,"\x03"),end="")
+print(sendToRepl(ser,"\r\n"),end="")
+print(sendToRepl(ser,"\r\n"),end="")
 
-print(sendToRepl(ser,"import os\r\n",.2))
-print(sendToRepl(ser,"os.chdir('/')\r\n",.2))
-microfiles = sendToRepl(ser,"os.listdir()\r\n",.2)
+print(safeStrToRepl(ser,"import os\r"),end="")
+print(safeStrToRepl(ser,"os.chdir('/')\r"),end="")
+microfiles = safeStrToRepl(ser,"os.listdir()\r")
 if microfiles.find('writefile.py') == -1:
     create_writefile()
-print(sendToRepl(ser,"import writefile\r\n",.2))
+print(safeStrToRepl(ser,"import writefile\r"),end="")
 
 inp = "*"
 hostfilename = ""
 microfilename = ""
-while inp[0].upper() != "Q":
+while inp.upper() != "Q":
     localdir = os.getcwd()
-    sendToRepl(ser,"\r\n")
+    sendCharToRepl(ser,"\r")
+    safeStrToRepl(ser,"os.getcwd()")
+    remotedir = sendCharToRepl(ser,"\r")
     try:
-        remotedir = sendToRepl(ser,"os.getcwd()\r\n",.1).split("\r\n")[1][1:-1]
+        #remotedir = sendToRepl(ser,"os.getcwd()\r\n",.1).split("\r\n")[1][1:-1]
+        remotedir = remotedir.split("\n")[1][1:-1]
     except:
         remotedir = '/'
+
     print()
     print("Local Dir: ",localdir," Remote (micro) Dir: ",remotedir)
     print("Host file: ",hostfilename," Remote (micro) file: ",microfilename)
@@ -249,8 +265,8 @@ while inp[0].upper() != "Q":
     elif inp.upper() == "NDIR":
         ndir = input("Enter new folder to create on Microcontroller in "+remotedir+" ($ to abort): ")
         if ndir != "$":
-            print(sendToRepl(ser,"os.mkdir('"+ndir+"')\r\n"))
-            sendToRepl(ser,"os.chdir('"+ndir+"')\r\n")
+            print(safeStrToRepl(ser,"os.mkdir('"+ndir+"')\r"))
+            safeStrToRepl(ser,"os.chdir('"+ndir+"')\r")
     elif inp.upper() == "LDIR":
         print_directory(localdir)
     elif inp.upper() == "RDIR":
@@ -261,7 +277,7 @@ while inp[0].upper() != "Q":
         except:
             print("Error setting requested default directory")
     elif inp.upper() == "RCD":
-        sendToRepl(ser,"os.chdir('"+input("Enter destination directory: ")+"')\r\n")
+        safeStrToRepl(ser,"os.chdir('"+input("Enter destination directory: ")+"')\r")
     elif inp.upper() == "RDEL":
         fndel = input("Enter filename/directory to delete ($ to abort): ")
         if fndel != "$":
@@ -270,36 +286,36 @@ while inp[0].upper() != "Q":
                 while ans.upper() not in ["Y","N"]:
                     ans = input("Delete all files in folder - Are you sure? (Y/N): ")
                 if ans.upper() == "Y":
-                    dirlisttxt = sendToRepl(ser,"os.listdir()\r\n",.5)
+                    dirlisttxt = safeStrToRepl(ser,"os.listdir()\r")
                     try:
-                        dirlist = (dirlisttxt.split('\r\n')[1:-1][0])[1:-1].replace("'","").replace(" ","").split(",")
+                        dirlist = (dirlisttxt.split('\n')[1:-1][0])[1:-1].replace("'","").replace(" ","").split(",")
                     except:
+                        print("*** Error processing directory listing ***")
                         dirlist = []
                     for file in dirlist:
-                        stattxt = sendToRepl(ser,"os.stat('"+file+"')\r\n",.1)
+                        stattxt = safeStrToRepl(ser,"os.stat('"+file+"')\r")
                         try:
-                            stats = list(map(int,(stattxt.split('\r\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
+                            stats = list(map(int,(stattxt.split('\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
+                            isdir = stats[0] & 0x4000
+                            if not isdir:
+                                print(safeStrToRepl(ser,"os.remove('"+file+"')\r"))
                         except:
-                            stats = [0x4000]
-
-                        isdir = stats[0] & 0x4000
-                        if not isdir:
-                            print(sendToRepl(ser,"os.remove('"+file+"')\r\n"))
+                            print("*** Can't determine file type for "+file+" ***")
             else:
-                stattxt = sendToRepl(ser,"os.stat('"+fndel+"')\r\n",.1)
+                stattxt = safeStrToRepl(ser,"os.stat('"+fndel+"')\r")
                 try:
-                    stats = list(map(int,(stattxt.split('\r\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
+                    stats = list(map(int,(stattxt.split('\n')[1:-1][0]).replace('(','').replace(')','').split(',')))
+                    isdir = stats[0] & 0x4000
+                    if isdir:
+                        print(safeStrToRepl(ser,"os.rmdir('"+fndel+"')\r"))
+                    else:
+                        print(safeStrToRepl(ser,"os.remove('"+fndel+"')\r"))
                 except:
-                    stats = [0x4000]
-                isdir = stats[0] & 0x4000
-                if isdir:
-                    print(sendToRepl(ser,"os.rmdir('"+fndel+"')\r\n"))
-                else:
-                    print(sendToRepl(ser,"os.remove('"+fndel+"')\r\n"))
+                    print("*** Can't determine file type for "+fndel+" ***")
     elif inp.upper() in ["COPY","CCOPY"]:
         tErr = 0
         os.chdir(localdir)
-        sendToRepl(ser,"os.chdir('"+remotedir+"')\r\n")
+        safeStrToRepl(ser,"os.chdir('"+remotedir+"')\r")
         if hostfilename[0] == "*":
             if hostfilename[1] == "." and len(hostfilename) > 2:
                 filterExt = hostfilename[1:]
@@ -320,7 +336,7 @@ while inp[0].upper() != "Q":
             print("Transmission Errors: ",tErr)
 
 
-    elif inp[0] == "?":
+    elif inp == "?":
         print("HFILE = Name of the file on the Host computer")
         print("        limited wildcards can be used as source")
         print("        wildcards must have a defined file extension")
@@ -341,5 +357,3 @@ while inp[0].upper() != "Q":
 
     elif inp.upper() == "Q":
         ser.close()
-
-
