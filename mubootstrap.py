@@ -3,22 +3,29 @@ import serial,time,os
 def reset_serial(ser):
     print("Resetting Serial Port...")
     try:
+        ser.flush()
         ser.close()
     except:
         pass
-    #return serial.Serial('com20',9600,timeout=10,write_timeout=15)
-    return serial.Serial('com33',115200,timeout=10,write_timeout=15)
+    return serial.Serial('com52',9600,timeout=10,write_timeout=15)
+    #return serial.Serial('com68',115200,timeout=10,write_timeout=15)
+    #return serial.Serial('com84',1200,timeout=10,write_timeout=15)
 
 def create_writefile():
     writefile = [
-                'def wf(filename):\\r\\n',
+                'def wf(filename,binary=""):\\r\\n',
                 '    if filename == "":\\r\\n',
                 '        filename = input("Filename?: ")\\r\\n',
-                '    file = open(filename,"w")\\r\\n',
+                '    file = open(filename,"w"+binary)\\r\\n',
                 '    inp = ""\\r\\n',
                 '    while inp != "*":\\r\\n',
                 '        inp = input(".")\\r\\n',
-                '        if inp != "*":\\r\\n',
+                '        if binary and inp != "*":\\r\\n',
+                '            inch = inp.split(",")\\r\\n',
+                '            for ch in inch:\\r\\n',
+                '                #file.write(bytes(chr(int(ch)),"utf-8"))\\r\\n',
+                '                file.write(int(ch).to_bytes(1,"big"))\\r\\n',
+                '        elif inp != "*":\\r\\n',
                 '            file.write(inp+"\\\\r\\\\n")\\r\\n',
                 '    file.close()\\r\\n']
 
@@ -60,7 +67,12 @@ def sendCharToRepl(ser,replCmd,prmpt=">>> "):
     return retVal
 
 def sendToRepl(ser,replCmd,delaytime=.01):
-    ser.write(replCmd.encode())
+    try:
+        ser.write(replCmd.encode())
+    except:
+        print("Error Writing to Serial")
+        return -1
+        
     wait_time = 5
     if delaytime > .0001:
         time.sleep(delaytime*5)
@@ -76,33 +88,63 @@ def sendToRepl(ser,replCmd,delaytime=.01):
         waiting = ser.inWaiting()
 
     if ser.inWaiting() and delaytime < .001:
-        return ser.read(ser.inWaiting()).decode()
+        try:
+            decodedRead = ser.read(ser.inWaiting()).decode()
+        except:
+            decodedRead = ""
+            
+        return decodedRead
     elif ser.inWaiting():
         retVal = ""
         while ser.inWaiting():
             #print("@",end="")
-            retVal += ser.read(ser.inWaiting()).decode()
+            try:
+                retVal += ser.read(ser.inWaiting()).decode()
+            except:
+                pass
             #time.sleep(delaytime)
 
         #retVal = ser.read(ser.inWaiting()).decode()
         return retVal
     else:
         return ""
+    
+def multicpy(srcdir,tardir):
+    curDLst = os.listdir(srcdir)
+    
+    print(safeStrToRepl(ser,"os.mkdir('"+tardir+"')\r"))
+    
+    for _dir in curDLst:
+        if os.stat(srcdir+'\\'+_dir)[0] & (2**15) != 0:
+            copyToRemote(srcdir+'\\'+_dir,tardir+'/'+_dir,True,True)
+        else:
+            multicpy(srcdir+'\\'+_dir,tardir+'/'+_dir)
 
-def copyToRemote(hostfilename,microfilename,careful=False):
+def copyToRemote(hostfilename,microfilename,careful=False,binary=False):
     transErr = 0
     if microfilename == "" or microfilename == "*":
         microfilename = hostfilename
-    file = open(hostfilename)
-    if careful:
+    if binary:
+        file = open(hostfilename,"rb")
+    else:
+        file = open(hostfilename)
+    if binary:
+        print(safeStrToRepl(ser,"writefile.wf('"+microfilename+"','b')\r","."),end="")
+    elif careful:
         print(safeStrToRepl(ser,"writefile.wf('"+microfilename+"')\r","."),end="")
     else:
         print(sendToRepl(ser,"writefile.wf('"+microfilename+"')\r\n"),end="")
     for line in file:
-        cleanLine = line.replace('\r','').replace('\n','').replace('\t','    ')
         #print(line,end="")
         tstline = ""
-        if cleanLine != "":
+        cleanLine = ""
+        if binary and line != b"":
+            for i in line:
+                cleanLine += str(i)+","
+            cleanLine = cleanLine[:-1]
+            tstline = safeStrToRepl(ser,cleanLine)
+        elif not binary and line.replace('\r','').replace('\n','') != "":
+            cleanLine = line.replace('\r','').replace('\n','').replace('\t','    ')
             if careful:
                 tstline = safeStrToRepl(ser,cleanLine)
             else:
@@ -136,7 +178,8 @@ def copyToRemote(hostfilename,microfilename,careful=False):
                     print(">"+cleanLine+"<")
                     transErr += 1
 
-        print(tstline,end="")
+        #print(tstline,end="")
+        print("#",end="")
         if careful:
             tstline = sendCharToRepl(ser,"\r",".")
         else:
@@ -154,11 +197,13 @@ def copyToRemote(hostfilename,microfilename,careful=False):
             tstline += ser.read(ser.inWaiting()).decode()
         if padtstline:
             tstline = tstline[1:]
-        print(tstline.replace('\r\n','\n'),end="")
+        #print(tstline.replace('\r\n','\n'),end="")
 
     if careful:
-        print(sendCharToRepl(ser,"*"),end="")
-        print(sendCharToRepl(ser,"\r"))
+        #print(sendCharToRepl(ser,"*"),end="")
+        #print(sendCharToRepl(ser,"\r"))
+        sendCharToRepl(ser,"*")
+        sendCharToRepl(ser,"\r")
     else:
         print(sendToRepl(ser,"*\r\n"),end="")
     file.close()
@@ -215,25 +260,58 @@ if ser.inWaiting():
     print(ser.read(ser.inWaiting()).decode(),end="")
 
 print("Attempting to get board attention")
-print(sendToRepl(ser,"\x02"),end="")
-try:
-    print(sendToRepl(ser," "),end="")
-except:
-    print(sendToRepl(ser,"\x04"),end="")
-if sendToRepl(ser,"\r\n") == "":
-    ser = reset_serial(ser)
-time.sleep(5)
-print(sendToRepl(ser,"\r\n"),end="")
-if sendToRepl(ser,"\r\n") == "":
-    print(sendToRepl(ser,"\x04"),end="")
-    time.sleep(5)
+tmp = sendToRepl(ser,"\r\n")
+if ">>>" not in str(tmp):
+    print('1 ',tmp,end="")
+    if tmp == -1:
+        ser = reset_serial(ser)
+    elif tmp == "":
+        print('^D',sendToRepl(ser,b"\x04"),end="")
+    time.sleep(3)
+    tmp = sendToRepl(ser," ")
+    print('2 ',tmp,end="")
+    if tmp == -1:
+        ser = reset_serial(ser)
+    time.sleep(1)
+    tmp = sendToRepl(ser,"\x03")
+    print('^C',tmp,end="")
+    if ">>>" not in str(tmp):
+        if tmp=="":
+            print('^?',sendToRepl(ser,"\x02"),end="")
+        print('3 ',sendToRepl(ser,"\r\n"),end="")
+        time.sleep(3)
+        print('4 ',sendToRepl(ser,"\r\n"),end="")
+        time.sleep(1)
+        tmp = sendToRepl(ser," ")
+        print('5b',tmp,end="")
+        if tmp == -1:
+            ser = reset_serial(ser)
+        elif tmp == "":
+            print('^D',sendToRepl(ser,"\x04"),end="")
 
-print(sendToRepl(ser,"\x03"),end="")
-print(sendToRepl(ser,"\r\n"),end="")
-print(sendToRepl(ser,"\r\n"),end="")
+        tmp = sendToRepl(ser,"\r\n")
+        print('6 ',tmp,end="")
+        if ">>>" not in str(tmp):
+            time.sleep(3)
+            print('7 ',sendToRepl(ser,"\r\n"),end="")
+            time.sleep(1)
+            if sendToRepl(ser,"\r\n") == "":
+                ser = reset_serial(ser)
+            time.sleep(5)
+            print('8 ',sendToRepl(ser,"\r\n"),end="")
+            if sendToRepl(ser,"\r\n") == "":
+                print('^D',sendToRepl(ser,"\x04"),end="")
+                time.sleep(5)
+
+            print('^C',sendToRepl(ser,"\x03"),end="")
+            time.sleep(1)
+            print('9 ',sendToRepl(ser,"\r\n"),end="")
+print('10',sendToRepl(ser,"\r\n"),end="")
 
 print(safeStrToRepl(ser,"import os\r"),end="")
 print(safeStrToRepl(ser,"os.chdir('/')\r"),end="")
+print(safeStrToRepl(ser,"import supervisor\r"),end="")
+print(safeStrToRepl(ser,"supervisor.runtime.autoreload=False\r"),end="")
 microfiles = safeStrToRepl(ser,"os.listdir()\r")
 if microfiles.find('writefile.py') == -1:
     create_writefile()
@@ -255,14 +333,14 @@ while inp.upper() != "Q":
 
     print()
     print("Local Dir: ",localdir," Remote (micro) Dir: ",remotedir)
-    print("Host file: ",hostfilename," Remote (micro) file: ",microfilename)
+    print("Local file: ",hostfilename," Remote (micro) file: ",microfilename)
     inp = input("Enter Command (? - Help, q - Quit): ")
 
-    if inp.upper() == "HFILE":
+    if inp.upper() == "LFILE":
         hostfilename = input("Enter the name of the file on the Host computer: ")
     elif inp.upper() == "RFILE":
         microfilename = input("Enter the name of the file to be created on the remote microcontroller: ")
-    elif inp.upper() == "NDIR":
+    elif inp.upper() == "RMD":
         ndir = input("Enter new folder to create on Microcontroller in "+remotedir+" ($ to abort): ")
         if ndir != "$":
             print(safeStrToRepl(ser,"os.mkdir('"+ndir+"')\r"))
@@ -312,7 +390,17 @@ while inp.upper() != "Q":
                         print(safeStrToRepl(ser,"os.remove('"+fndel+"')\r"))
                 except:
                     print("*** Can't determine file type for "+fndel+" ***")
-    elif inp.upper() in ["COPY","CCOPY"]:
+    elif inp.upper() == "CFOLDER":
+        print("Copy all files from HOST:"+localdir+" and any subfolders to Microcontroller REMOTE:"+remotedir)
+        print("This will overwrite any files with the same filename on the Microcontroller")
+        if input("Continue? (Y/N): ").upper() == "Y":
+            multicpy(localdir,remotedir)
+    elif inp.upper() in ["COPY","CCOPY","BCOPY"]:
+        if inp.upper() == "BCOPY":
+            inp = "CCOPY"
+            binflag = True
+        else:
+            binflag = False
         tErr = 0
         os.chdir(localdir)
         safeStrToRepl(ser,"os.chdir('"+remotedir+"')\r")
@@ -322,7 +410,7 @@ while inp.upper() != "Q":
                 for filename in os.listdir():
                     if filename[-(len(filterExt)):] == filterExt:
                         if inp.upper() == "CCOPY":
-                            tErr += copyToRemote(filename,filename,True)
+                            tErr += copyToRemote(filename,filename,True,binflag)
                         else:
                             tErr += copyToRemote(filename,filename)
                 print("Transmission Errors: ",tErr)
@@ -330,14 +418,14 @@ while inp.upper() != "Q":
                 print("*ERROR* Wildcard by file extension only (ie *.py)")
         else:
             if inp.upper() == "CCOPY":
-                tErr = copyToRemote(hostfilename,microfilename,True)
+                tErr = copyToRemote(hostfilename,microfilename,True,binflag)
             else:
                 tErr = copyToRemote(hostfilename,microfilename)
             print("Transmission Errors: ",tErr)
 
 
     elif inp == "?":
-        print("HFILE = Name of the file on the Host computer")
+        print("LFILE = Name of the file on the Host computer")
         print("        limited wildcards can be used as source")
         print("        wildcards must have a defined file extension")
         print("        i.e. *.py, *.txt, ...")
@@ -348,12 +436,15 @@ while inp.upper() != "Q":
         print("      When changing directories, relative directory paths work")
         print("      i.e. '..' up one, '../..' up 2")
         print("      paths that don't start with a '/','\\' will be from the current path")
-        print("NDIR = Create a new directory on the Microcontroller")
+        print("RMD  = Create a new directory on the Microcontroller")
         print("LDIR = Display files in local source directory")
         print("RDIR = Display files in remote (Microcontroller) destination directory")
         print("RDEL = Delete a file/directory from Microcontroller")
         print("COPY = Copy the current file from the local directory to the remote directory")
         print("CCOPY= Character (careful) verion of copy routine")
+        print("BCOPY= Binary (careful only) version of copy routine")
+        print("CFOLDER=Recursivley copy contents of current local source directory to remote directory")
 
     elif inp.upper() == "Q":
+        ser.flush()
         ser.close()
