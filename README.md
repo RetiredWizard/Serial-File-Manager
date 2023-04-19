@@ -18,20 +18,23 @@ This is primarly useful for accessing the Flash on CircuitPython or MicroPython 
 
 **The File Copy function will only work with text files, binary files are NOT supported.**
 
-- HFILE = Name of the file on the Host computer
+- LFILE = Name of the file on the Host (Local) computer
           limited wildcards can be used as source
           wildcards must have a defined file extension
           i.e. *.py, *.txt, ...
-- MFILE = Name of the file to be created on the Microcontroller
+- RFILE = Name of the file to be created on the (Remote) Microcontroller
           Leave blank or '*' to use Host filename (no rename)
 - LCD = Set the local (source) directory on the Host computer
 - RCD = Set the remote (destination) directory on the Microcontroller
         When changing directories, relative directory paths work
         i.e. '..' up one, '../..' up 2
         paths that don't start with a '/','\' will be from the current path
-- NDIR = Create a new directory on the Microcontroller
+- RMD  = Create a new directory on the Microcontroller
 - LDIR = Display files in local source directory
 - RDIR = Display files in remote (Microcontroller) destination directory
 - RDEL = Delete a file/directory on Microcontroller
 - COPY = Copy the current file from the local directory to the remote directory
+- CCOPY= Character (careful) verion of copy routine
+- BCOPY= Binary (careful only) version of copy routine
+- CFOLDER=Recursivley (binary) copy contents of current local source directory to remote directory
 
