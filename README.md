@@ -16,7 +16,8 @@ This is primarly useful for accessing the Flash on CircuitPython or MicroPython 
 
 ## File Manager Commands ##
 
-**The File Copy function will only work with text files, binary files are NOT supported.**
+**The COPY/CCOPY commands will only work with text files, binary files are NOT supported.**
+**Use the BCOPY or CFOLDER command for binary files.**
 
 - LFILE = Name of the file on the Host (Local) computer
           limited wildcards can be used as source
